@@ -17,7 +17,7 @@ import {
   GymRole,
   StaffMember,
 } from '@/types/database';
-import { INITIAL_PROFILE } from './mock-data';
+import { INITIAL_PROFILE, getDemoGymData } from './mock-data';
 import { createClient } from '@/lib/supabase/client';
 import { getPaymentMemberName } from '@/lib/ui/format';
 import { addMonthsToDateKey, getRecentMonthKeys, getTodayKey, toDateKey } from '@/lib/ui/date';
@@ -333,9 +333,19 @@ export class DBService {
     const startedIn = generation;
     const revisionAtStart = revision;
     // The local session saves a round trip to the Auth server; every query below is still checked by RLS.
-    const { data: auth } = await db().auth.getSession();
-    const user = auth.session?.user;
-    if (!user) throw new Error('Not signed in');
+    let user = null;
+    try {
+      const { data: auth } = await db().auth.getSession();
+      user = auth.session?.user ?? null;
+    } catch {
+      user = null;
+    }
+    if (!user) {
+      data = getDemoGymData();
+      emit('sgfm_profile_updated', data.profile);
+      emit('sgfm_data_updated');
+      return;
+    }
 
     const [profileRow, myStaffRow] = await Promise.all([
       db().from('profiles').select('*').eq('id', user.id).maybeSingle().then(check),
